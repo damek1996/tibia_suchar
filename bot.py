@@ -1,31 +1,54 @@
+import os
 import discord
 from discord.ext import tasks, commands
 import google.generativeai as genai
 import datetime
+import pytz # Obsługa stref czasowych, żeby 09:00 było polskie
 
-# --- KONFIGURACJA ---
-GEMINI_KEY = "AIzaSyAle5ezENBqiDuAH1t-TBEUR12xUFk_w6o"
-DISCORD_TOKEN = "MTQ3ODg4NjMyMzMxMjkxODU3OQ.GD4360.uA9mN5OFgHxwCzjC4Xbxl-tBWnDRjXu4J9H6_Q"
-CHANNEL_ID = 1413797945601425418  # Kliknij prawym na kanał na Discordzie -> Kopiuj ID
+# --- POBIERANIE DANYCH Z KOŃCÓWKI SYSTEMOWEJ (RAILWAY) ---
+TOKEN = os.getenv("DISCORD_TOKEN")
+GEMINI_KEY = os.getenv("GEMINI_KEY")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# Konfiguracja AI
+# Konfiguracja AI Gemini
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash') # Szybki i darmowy model
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+# Konfiguracja Bota Discord
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-@tasks.loop(time=datetime.time(hour=9, minute=0)) # Codziennie o 09:00
+# Definicja godziny 09:00 w polskiej strefie czasowej
+POLAND_TZ = pytz.timezone("Europe/Warsaw")
+TARGET_TIME = datetime.time(hour=9, minute=0, tzinfo=POLAND_TZ)
+
+@tasks.loop(time=TARGET_TIME)
 async def daily_joke():
-    channel = bot.get_channel(CHANNEL_ID)
+    channel = bot.get_channel(int(CHANNEL_ID))
     if channel:
-        prompt = "Jesteś Karolem Strasburgerem w świecie gry Tibia. Napisz krótki, suchy żart o graczach, potworach lub mechanikach Tibii. Zakończ go 'tutu-tutu'!"
-        response = model.generate_content(prompt)
-        await channel.send(f"🏆 **TIBIJSKA FAMILIADA: SUCHAR DNIA** 🏆\n\n{response.text}")
+        try:
+            prompt = (
+                "Jesteś prowadzącym Tibijską Familiadę. Napisz krótki, bardzo suchy żart "
+                "dotyczący gry Tibia (np. o PK-erach, lootowaniu, skillowaniu lub miastach). "
+                "Używaj slangu graczy. Na koniec dodaj kultowe 'tutu-tutu' lub dźwięk 'X X X'."
+            )
+            response = model.generate_content(prompt)
+            await channel.send(f"☀️ **TIBIJSKI SUCHAR DNIA** ☀️\n\n{response.text}")
+        except Exception as e:
+            print(f"Błąd AI: {e}")
+
+@bot.command()
+async def suchar(ctx):
+    """Komenda ręczna, gdyby ktoś chciał żart od razu"""
+    prompt = "Napisz szybki suchar o Tibii w stylu Karola Strasburgera."
+    response = model.generate_content(prompt)
+    await ctx.send(response.text)
 
 @bot.event
 async def on_ready():
-    print(f'Zalogowano jako {bot.user}! Tibijczyk gotowy do żartów.')
+    print(f'Bot {bot.user} wystartował pomyślnie!')
     if not daily_joke.is_running():
         daily_joke.start()
 
-bot.run(DISCORD_TOKEN)
+bot.run(TOKEN)
