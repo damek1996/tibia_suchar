@@ -38,7 +38,7 @@ async def get_ai_joke():
         "Na koniec dodaj 'tutu-tutu'!"
     )
     # Zmiana sposobu wywołania na nowy standard SDK
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
     return response.text
 
 @tasks.loop(time=TARGET_TIME)
@@ -68,3 +68,4 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name="Tibijska Familiada | /daj_suchara"))
 
 bot.run(TOKEN)
+
